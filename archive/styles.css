@@ -1,0 +1,167 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: monospace;
+    background: white;
+    color: black;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.screen-content {
+    flex: 1;
+    padding: 40px;
+}
+
+.navigation {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-top: 1px solid black;
+}
+
+.nav-btn {
+    padding: 10px 20px;
+    font-size: 1em;
+    border: 1px solid black;
+    background: white;
+    color: black;
+    cursor: pointer;
+    font-family: monospace;
+}
+
+.nav-btn:hover:not(:disabled) {
+    background: black;
+    color: white;
+}
+
+.nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.nav-center {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.screen-indicator {
+    font-size: 0.9em;
+}
+
+/* Notes popup */
+.notes-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+
+.notes-overlay.active {
+    display: flex;
+}
+
+.notes-popup {
+    background: white;
+    border: 2px solid black;
+    padding: 30px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.notes-popup h2 {
+    margin-bottom: 20px;
+    border-bottom: 1px solid black;
+    padding-bottom: 10px;
+}
+
+.notes-popup .close-btn {
+    margin-top: 20px;
+}
+
+/* Screen 1.4 specific styles */
+.screen-layout {
+    display: flex;
+    gap: 40px;
+    height: 100%;
+}
+
+.diagram-box {
+    flex: 1;
+    border: 2px solid black;
+    padding: 20px;
+    position: relative;
+}
+
+.diagram-title {
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+.tree {
+    padding-left: 20px;
+}
+
+.tree-item {
+    margin: 8px 0;
+    position: relative;
+}
+
+.tree-item::before {
+    content: "└→";
+    margin-right: 5px;
+}
+
+.tree-item.nested {
+    padding-left: 25px;
+}
+
+.tree-item.nested::before {
+    content: "└→";
+}
+
+.marker {
+    position: absolute;
+    color: red;
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+.marker-1 { bottom: 10px; left: 10px; }
+.marker-2 { bottom: 10px; right: 10px; }
+.marker-3 { top: 50%; right: -25px; }
+.marker-4 { top: 10px; left: -25px; }
+
+.feature-card {
+    width: 250px;
+    border: 2px solid black;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    position: relative;
+}
+
+.feature-card h2 {
+    font-size: 1.5em;
+    line-height: 1.4;
+}
+

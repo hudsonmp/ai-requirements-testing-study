@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screen 1.4</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="screen-content">
+        <div class="screen-layout">
+            <div class="diagram-box">
+                <span class="marker marker-4">4</span>
+                <div class="diagram-title">Viewpoint 1</div>
+                <div class="tree">
+                    <div class="tree-item">requirement 1</div>
+                    <div class="tree-item nested">sub-requirement 1</div>
+                    <div class="tree-item nested" style="padding-left: 50px;">constraints</div>
+                    <div class="tree-item nested">sub-requirement 2</div>
+                </div>
+                <span class="marker marker-2">2</span>
+                <span class="marker marker-3">3</span>
+            </div>
+            <div class="feature-card">
+                <h2>Forked code from a feature</h2>
+                <span class="marker marker-1">1 📎</span>
+            </div>
+        </div>
+    </div>
+    <div class="navigation">
+        <button class="nav-btn" onclick="goBack()">← Back</button>
+        <div class="nav-center">
+            <span class="screen-indicator">Screen 1.4 of 3.5</span>
+            <button class="nav-btn" onclick="openNotes()">View Notes</button>
+        </div>
+        <button class="nav-btn" onclick="goForward()">Forward →</button>
+    </div>
+    <div class="notes-overlay" id="notesOverlay">
+        <div class="notes-popup">
+            <h2>Notes</h2>
+            <div id="notesContent">
+                <p>1) This loads a card with our PDF document explaining the feature</p>
+                <p>2) Researcher hints: try doing [actions] in code.</p>
+                <p>3) This will also have a list of the user clicks & interactions within our code</p>
+                <p>4) At this point, student will write system level pseudocode based on their viewpoints. They should consider the edge cases from perspective of stakeholder by writing some test cases</p>
+            </div>
+            <button class="nav-btn close-btn" onclick="closeNotes()">Close</button>
+        </div>
+    </div>
+    <script src="navigation.js"></script>
+</body>
+</html>

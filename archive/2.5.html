@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screen 2.5</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="screen-content">
+    </div>
+    <div class="navigation">
+        <button class="nav-btn" onclick="goBack()">← Back</button>
+        <div class="nav-center">
+            <span class="screen-indicator">Screen 2.5 of 3.5</span>
+            <button class="nav-btn" onclick="openNotes()">View Notes</button>
+        </div>
+        <button class="nav-btn" onclick="goForward()">Forward →</button>
+    </div>
+    <div class="notes-overlay" id="notesOverlay">
+        <div class="notes-popup">
+            <h2>Notes</h2>
+            <div id="notesContent"></div>
+            <button class="nav-btn close-btn" onclick="closeNotes()">Close</button>
+        </div>
+    </div>
+    <script src="navigation.js"></script>
+</body>
+</html>

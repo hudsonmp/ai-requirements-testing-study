@@ -1,39 +1,66 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import MarkdownEditor from './components/MarkdownEditor'
 import NoVNCViewer from './components/NoVNCViewer'
-import GraphvizPanel from './components/GraphvizPanel'
+import TreePanel from './components/TreePanel'
 
 const SCROLL_DELAY = 500
 
 export default function App() {
   const [ws, setWs] = useState(null)
-  const [dot, setDot] = useState('digraph G { "Start" }')
+  const [tree, setTree] = useState({ name: 'User Session', children: [] })
   const [notes, setNotes] = useState('')
   const scrollTimeout = useRef(null)
 
   // WebSocket connection
   useEffect(() => {
+    console.log('[App] Connecting to WebSocket...')
     const socket = new WebSocket('ws://localhost:8000/ws')
-    socket.onopen = () => console.log('WebSocket connected')
-    socket.onmessage = (e) => {
-      const data = JSON.parse(e.data)
-      if (data.type === 'graph_update') setDot(data.dot)
+    socket.onopen = () => {
+      console.log('[App] ✓ WebSocket connected')
+      setWs(socket)
     }
-    socket.onerror = (e) => console.error('WebSocket error:', e)
-    setWs(socket)
+    socket.onmessage = (e) => {
+      console.log('[App] 📩 Message from backend:', e.data)
+      try {
+        const data = JSON.parse(e.data)
+        console.log('[App] Parsed data type:', data.type)
+        
+        if (data.type === 'ack') {
+          console.log('[App] ✓ Backend acknowledged trigger:', data.trigger)
+        } else if (data.type === 'tree_update') {
+          console.log('[App] 🌲 Tree update received!')
+          console.log('[App] Tree name:', data.tree?.name)
+          console.log('[App] Tree children count:', data.tree?.children?.length)
+          console.log('[App] Full tree:', JSON.stringify(data.tree, null, 2))
+          // Force new object reference to trigger React re-render
+          const newTree = JSON.parse(JSON.stringify(data.tree))
+          setTree(newTree)
+          console.log('[App] ✓ Tree state updated')
+        }
+      } catch (error) {
+        console.error('[App] ✗ Failed to parse WebSocket message:', error, e.data)
+      }
+    }
+    socket.onerror = (e) => console.error('[App] WebSocket error:', e)
+    socket.onclose = () => console.log('[App] WebSocket closed')
     return () => socket.close()
   }, [])
 
   // Send trigger event to backend
   const sendTrigger = useCallback((trigger, screenshot = null) => {
+    console.log('[App] sendTrigger called:', trigger, 'WS ready:', ws?.readyState === WebSocket.OPEN)
     if (ws?.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
+      const payload = {
         type: 'trigger',
         trigger,
         url: window.location.href,
         screenshot,
         timestamp: Date.now()
-      }))
+      }
+      console.log('[App] Sending to backend:', payload)
+      ws.send(JSON.stringify(payload))
+    } else {
+      console.error('[App] WebSocket not ready! State:', ws?.readyState)
     }
   }, [ws])
 
@@ -65,7 +92,7 @@ export default function App() {
           <NoVNCViewer onTrigger={sendTrigger} />
         </section>
         <aside style={styles.rightPanel}>
-          <GraphvizPanel dot={dot} />
+          <TreePanel tree={tree} />
         </aside>
       </main>
     </div>

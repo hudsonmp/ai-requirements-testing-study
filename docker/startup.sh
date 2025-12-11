@@ -10,6 +10,9 @@ vncserver :1 -geometry 1280x720 -depth 24
 # Wait for VNC/X to initialize
 sleep 3
 
+# Disable terminal bell
+DISPLAY=:1 xset b off
+
 # Launch Chromium
 echo "Starting Chromium..."
 DISPLAY=:1 /usr/bin/chromium \

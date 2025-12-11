@@ -1,0 +1,87 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.env/
+ENV/
+virtualenv/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+package-lock.json
+yarn.lock
+.next/
+out/
+.nuxt/
+.cache/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Build outputs
+dist/
+build/
+*.min.js
+*.min.css
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Docker
+docker-compose.override.yml
+.docker/
+docker/data/
+volumes/
+
+# Testing
+.pytest_cache/
+.coverage
+coverage/
+htmlcov/
+.tox/
+*.cover
+
+# Data & Uploads
+data/
+uploads/
+media/
+static/collected-static/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.cache

@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  vnc:
+    build: ./docker
+    ports:
+      - "5901:5901"
+      - "6080:6080"
+    environment:
+      - VNC_PASSWORD=password
+    volumes:
+      - ./data:/data
+    shm_size: '2gb'
+

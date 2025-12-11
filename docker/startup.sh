@@ -1,33 +1,22 @@
 #!/bin/bash
-set -e
 
 # Kill any existing VNC sessions
 vncserver -kill :1 2>/dev/null || true
+rm -rf /tmp/.X1-lock /tmp/.X11-unix/X1 2>/dev/null || true
 
-# Start VNC server
-vncserver :1 -geometry 1280x720 -depth 24 -localhost no
+# Start VNC server (this runs xstartup which launches openbox)
+vncserver :1 -geometry 1280x720 -depth 24
 
-# Wait for VNC to initialize
+# Wait for VNC/X to initialize
 sleep 3
 
-# Start dbus (required for XFCE)
-export DISPLAY=:1
-eval $(dbus-launch --sh-syntax)
-
-# Start XFCE desktop environment in background
-startxfce4 &
-
-# Wait for desktop to fully load
-sleep 5
-
-# Launch Chromium browser with all necessary flags
+# Launch Chromium
 echo "Starting Chromium..."
-/usr/bin/chromium-browser \
+DISPLAY=:1 /usr/bin/chromium \
   --no-sandbox \
   --disable-dev-shm-usage \
   --disable-gpu \
   --disable-software-rasterizer \
-  --disable-setuid-sandbox \
   --no-first-run \
   --disable-features=VizDisplayCompositor \
   --start-maximized \
@@ -37,4 +26,3 @@ echo "Chromium started with PID $!"
 
 # Start noVNC websocket proxy (blocking)
 websockify --web=/usr/share/novnc/ 6080 localhost:5901
-

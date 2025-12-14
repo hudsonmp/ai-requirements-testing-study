@@ -8,29 +8,30 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-from data import DataAnalyzer
+from data import DataAnalyzer, ParticipantDataManager
 from mouse_movements import MouseTracker
 from gemini_graphviz import GeminiTreeAnalyzer
-from vnc_capture import capture_vnc_screenshot
+from vnc_capture import capture_vnc_screenshot, get_url_bar_hash
 
 load_dotenv()
 
 # Global instances
 analyzer = DataAnalyzer()
 mouse_tracker = MouseTracker()
-gemini_analyzer = GeminiTreeAnalyzer(os.getenv("GEMINI_API_KEY"))
+gemini_analyzer = GeminiTreeAnalyzer(os.getenv("GEMINI_API_KEY"), analyzer.load_tree())
+
+# Active participant session (None when in researcher mode)
+active_participant: ParticipantDataManager | None = None
+
+# Store researcher's tree when entering participant mode
+saved_researcher_tree: dict | None = None
 
 # Track last state for change detection
 last_screenshot_hash = ""
-last_url = ""
-
-# Batching: 3-second debounce for Gemini calls
-BATCH_DELAY_SECONDS = 3
-pending_analysis_task = None
-pending_screenshot = None
+last_url_bar_hash = ""
 
 class ChangeCheckRequest(BaseModel):
-    lastUrl: str = ""
+    lastUrlBarHash: str = ""
     lastScreenHash: str = ""
 
 # WebSocket connection manager
@@ -43,74 +44,52 @@ class ConnectionManager:
         self.active.append(ws)
 
     def disconnect(self, ws: WebSocket):
-        self.active.remove(ws)
+        if ws in self.active:
+            self.active.remove(ws)
 
     async def broadcast(self, data: dict):
-        print(f"[WS] Broadcasting to {len(self.active)} clients: {str(data)[:100]}...")
-        disconnected = []
-        for ws in self.active:
+        if not self.active:
+            return
+        for ws in self.active.copy():
             try:
                 await ws.send_json(data)
-                print(f"[WS] ✓ Sent to client successfully")
-            except Exception as e:
-                print(f"[WS] ✗ Failed to send to client: {e}")
-                disconnected.append(ws)
-        # Clean up dead connections
-        for ws in disconnected:
-            self.active.remove(ws)
-            print(f"[WS] Removed dead connection, {len(self.active)} active")
+            except Exception:
+                if ws in self.active:
+                    self.active.remove(ws)
 
 manager = ConnectionManager()
 
-async def schedule_batched_analysis(screenshot=None):
-    """Schedule Gemini analysis with 3-second batching/debounce."""
-    global pending_analysis_task, pending_screenshot
+async def run_analysis(screenshot=None):
+    """Run Gemini analysis immediately."""
+    global active_participant
     
-    # Capture screenshot now if not provided
     if not screenshot:
-        print("[Batch] No screenshot provided, capturing from VNC...")
         screenshot = capture_vnc_screenshot()
     
-    if screenshot:
-        pending_screenshot = screenshot
-        print(f"[Batch] Screenshot queued ({len(screenshot)} chars)")
-    
-    # Cancel existing pending task if any
-    if pending_analysis_task and not pending_analysis_task.done():
-        pending_analysis_task.cancel()
-        print(f"[Batch] Cancelled pending task, restarting {BATCH_DELAY_SECONDS}s timer")
-    
-    # Schedule new analysis after delay
-    pending_analysis_task = asyncio.create_task(run_batched_analysis())
-
-async def run_batched_analysis():
-    """Wait for batch delay then run Gemini analysis."""
-    global pending_screenshot
+    if not screenshot:
+        print("[ERROR] No screenshot available")
+        return
     
     try:
-        print(f"[Batch] Waiting {BATCH_DELAY_SECONDS}s for more events...")
-        await asyncio.sleep(BATCH_DELAY_SECONDS)
+        tree = await gemini_analyzer.analyze_screenshot(
+            screenshot,
+            analyzer.get_metadata()
+        )
         
-        if pending_screenshot:
-            print("[Batch] Timer complete, sending to Gemini...")
-            tree = await gemini_analyzer.analyze_screenshot(
-                pending_screenshot,
-                analyzer.get_metadata()
-            )
-            print(f"[Batch] Broadcasting tree update: {tree.get('name', 'Unknown')} with {len(tree.get('children', []))} children")
-            await manager.broadcast({"type": "tree_update", "tree": tree})
-            pending_screenshot = None
+        if active_participant:
+            # Participant mode: only save to participant's private data
+            active_participant.save_tree(tree)
         else:
-            print("[Batch] ⚠ No screenshot available")
-    except asyncio.CancelledError:
-        pass  # Task was cancelled by new trigger
+            # Researcher mode: save to researcher's data
+            analyzer.save_tree(tree)
+        
+        await manager.broadcast({"type": "tree_update", "tree": tree})
+    except Exception as e:
+        print(f"[ERROR] Gemini analysis failed: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize browser permissions and services."""
-    print("Initializing services...")
     yield
-    print("Shutting down...")
 
 app = FastAPI(lifespan=lifespan)
 
@@ -125,90 +104,177 @@ app.add_middleware(
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     """Main WebSocket for all frontend communication."""
-    print("[WS] Client connecting...")
     await manager.connect(ws)
-    print("[WS] Client connected successfully")
     try:
         while True:
             data = await ws.receive_json()
             event_type = data.get("type")
-            print(f"[WS] Received event: {event_type}, data: {data}")
             
             if event_type == "mouse":
-                print("[WS] Processing mouse event")
                 mouse_tracker.log_event(data)
             elif event_type == "trigger":
-                print(f"[WS] Processing trigger: {data.get('trigger')}")
-                # Immediately acknowledge receipt
-                await ws.send_json({"type": "ack", "trigger": data.get('trigger')})
-                # URL change, click, scroll, or page change
-                analyzer.log_action(data)
-                # Schedule batched analysis (3-second debounce)
-                await schedule_batched_analysis(data.get("screenshot"))
+                trigger = data.get('trigger')
+                if trigger in ('click', 'url_change'):
+                    print(f"[TRIGGER] {trigger}")
+                    try:
+                        await ws.send_json({"type": "ack", "trigger": trigger})
+                    except Exception:
+                        pass
+                    
+                    if active_participant:
+                        # Participant mode: only log to participant
+                        active_participant.log_action(data)
+                    else:
+                        # Researcher mode: log to researcher
+                        analyzer.log_action(data)
+                    
+                    await run_analysis(data.get("screenshot"))
             elif event_type == "notes":
-                print("[WS] Saving notes")
                 analyzer.save_notes(data.get("content", ""))
-    except WebSocketDisconnect:
-        print("[WS] Client disconnected")
+            elif event_type == "participant_notes":
+                if active_participant:
+                    active_participant.save_notes(data.get("content", ""))
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+    finally:
         manager.disconnect(ws)
 
 @app.post("/check-changes")
 async def check_changes(request: ChangeCheckRequest):
-    """Check if screen or URL has changed since last check."""
-    global last_screenshot_hash, last_url
+    """Check if screen or URL bar has changed since last check."""
+    global last_screenshot_hash, last_url_bar_hash
     
-    print(f"[API] Checking for changes... Last hash: {request.lastScreenHash[:8] if request.lastScreenHash else 'none'}")
-    
-    # Capture current screenshot
     screenshot = capture_vnc_screenshot()
     if not screenshot:
         return {"changed": False, "error": "Failed to capture screenshot"}
     
-    # Hash the screenshot to detect visual changes
     current_hash = hashlib.sha256(screenshot.encode()).hexdigest()[:16]
+    current_url_bar_hash = get_url_bar_hash(screenshot)
     
-    # For URL detection, we'd need to inject JavaScript into the VNC browser
-    # For now, we'll just use screenshot hash comparison
-    changed = current_hash != request.lastScreenHash
+    url_changed = current_url_bar_hash != request.lastUrlBarHash and request.lastUrlBarHash != ""
+    screen_changed = current_hash != request.lastScreenHash
     
-    if changed:
-        print(f"[API] ✓ Change detected! New hash: {current_hash[:8]}")
+    if url_changed or screen_changed:
+        if url_changed:
+            print(f"[POST] /check-changes - URL bar changed")
         last_screenshot_hash = current_hash
+        last_url_bar_hash = current_url_bar_hash
         return {
             "changed": True,
+            "urlChanged": url_changed,
             "screenHash": current_hash,
-            "url": last_url,
+            "urlBarHash": current_url_bar_hash,
             "screenshot": screenshot
         }
-    else:
-        print(f"[API] No changes detected")
-        return {"changed": False}
+    return {"changed": False}
 
 @app.post("/force-capture")
 async def force_capture():
     """Force capture, analyze with Gemini, and broadcast update."""
-    print("[API] Force capture requested")
+    print("[POST] /force-capture")
     screenshot = capture_vnc_screenshot()
     if screenshot:
-        current_hash = hashlib.sha256(screenshot.encode()).hexdigest()[:16]
-        print(f"[API] ✓ Force capture complete: {current_hash[:8]}")
-        
-        # Send to Gemini for analysis
-        print("[API] Sending to Gemini for analysis...")
         tree = await gemini_analyzer.analyze_screenshot(
             screenshot, 
             analyzer.get_metadata()
         )
         
-        # Broadcast updated tree to all connected clients
-        print(f"[API] Broadcasting tree update: {tree.get('name', 'Unknown')} with {len(tree.get('children', []))} children")
-        await manager.broadcast({"type": "tree_update", "tree": tree})
+        if active_participant:
+            active_participant.save_tree(tree)
+        else:
+            analyzer.save_tree(tree)
         
+        await manager.broadcast({"type": "tree_update", "tree": tree})
         return {"success": True, "message": "Captured and analyzed"}
     else:
+        print("[ERROR] /force-capture - screenshot failed")
         return {"error": "Failed to capture screenshot"}
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
+@app.get("/state")
+async def get_state():
+    """Get current tree, notes, and highlights for frontend initialization."""
+    notes = ""
+    if analyzer.notes_file.exists():
+        notes = analyzer.notes_file.read_text()
+    return {
+        "tree": gemini_analyzer.current_tree,
+        "notes": notes,
+        "highlights": analyzer.load_highlights()
+    }
+
+class TreeUpdateRequest(BaseModel):
+    tree: dict
+
+@app.post("/save-tree")
+async def save_tree(request: TreeUpdateRequest):
+    """Save updated tree (after deletions/edits)."""
+    gemini_analyzer.current_tree = request.tree
+    analyzer.save_tree(request.tree)
+    await manager.broadcast({"type": "tree_update", "tree": request.tree})
+    return {"success": True}
+
+class HighlightsUpdateRequest(BaseModel):
+    highlights: dict
+
+@app.post("/save-highlights")
+async def save_highlights(request: HighlightsUpdateRequest):
+    """Save tree highlights/annotations."""
+    analyzer.save_highlights(request.highlights)
+    return {"success": True}
+
+
+class StartParticipantRequest(BaseModel):
+    firstName: str
+    lastName: str
+
+@app.post("/start-participant")
+async def start_participant(request: StartParticipantRequest):
+    """Start a new participant session with their own private data storage."""
+    global active_participant, saved_researcher_tree
+    
+    # Save researcher's current tree before starting participant session
+    saved_researcher_tree = gemini_analyzer.current_tree
+    
+    # Reset to empty tree for participant
+    gemini_analyzer.current_tree = {"name": "User Session", "children": []}
+    
+    active_participant = ParticipantDataManager(request.firstName, request.lastName)
+    return {
+        "success": True,
+        "participantId": active_participant.participant_id
+    }
+
+@app.post("/end-participant")
+async def end_participant():
+    """End current participant session and restore researcher's tree."""
+    global active_participant, saved_researcher_tree
+    
+    # Restore researcher's tree
+    if saved_researcher_tree:
+        gemini_analyzer.current_tree = saved_researcher_tree
+        saved_researcher_tree = None
+    
+    active_participant = None
+    return {"success": True}
+
+@app.post("/participant-notes")
+async def save_participant_notes(content: str = ""):
+    """Save notes for current participant."""
+    if active_participant:
+        active_participant.save_notes(content)
+        return {"success": True}
+    return {"success": False, "error": "No active participant"}
+
+@app.get("/participant-state")
+async def get_participant_state():
+    """Get current participant's tree (separate from researcher data)."""
+    if active_participant:
+        return {
+            "tree": active_participant.load_tree(),
+            "participantId": active_participant.participant_id
+        }
+    return {"tree": {"name": "User Session", "children": []}, "participantId": None}

@@ -11,18 +11,21 @@ FOCUS ONLY ON:
 1. **Shopping Cart** - Adding items, viewing cart, modifying quantities, removing items
 2. **Checkout Process** - All steps from cart to order completion
 3. **Authentication** - Login, logout, account creation, password reset
+4. **Support/Help** - Customer support, help pages, contact forms within checkout/cart context
 
-IGNORE: search, browse, product listings, navigation, filters - unless directly leading to cart/checkout/auth.
+IGNORE: search, browse, product listings, navigation, filters - unless directly leading to cart/checkout/auth/support.
 
-STRUCTURE - Each interaction has TWO levels:
-- **LOA 1 (Page Context)**: Brief description of what page/screen is shown
-- **LOA 2 (User Interactions)**: DETAILED list of ALL possible actions user could take - be VERY thorough
+STRUCTURE - Each interaction has THREE levels:
+- **LOA 1 (Visual State)**: What CHANGED visually - new images, logos, icons, banners, colors, expanded sections
+- **LOA 2 (Content State)**: Text, prices, product info, messages, form states currently displayed
+- **LOA 3 (Available Actions)**: DETAILED list of ALL interactive elements user could click/type/select
 
 RULES:
 - Return COMPLETE tree with ALL previous interactions intact
 - Add NEW interaction only if page/state changed from last one
 - Number sequentially: "Interaction 1", "Interaction 2", etc.
 - NEVER modify previous interactions
+- ALWAYS note visual changes (new logo appeared, image changed, section expanded, etc.)
 
 Return ONLY valid JSON:
 {
@@ -32,22 +35,27 @@ Return ONLY valid JSON:
       "name": "Interaction 1",
       "children": [
         {
-          "name": "LOA 1: Product Page - Add to Cart Section",
+          "name": "LOA 1: Visual State",
           "children": [
-            {"name": "Product: [product name] displayed"},
-            {"name": "Price: $XX.XX shown"},
-            {"name": "Add to Cart button visible"}
+            {"name": "Product image: [description]"},
+            {"name": "Brand logo: [brand name] visible"},
+            {"name": "Banner/header: [description]"}
           ]
         },
         {
-          "name": "LOA 2: Available User Actions",
+          "name": "LOA 2: Content State",
+          "children": [
+            {"name": "Product: [product name]"},
+            {"name": "Price: $XX.XX"},
+            {"name": "Description: [key details]"}
+          ]
+        },
+        {
+          "name": "LOA 3: Available Actions",
           "children": [
             {"name": "Click 'Add to Cart' button"},
             {"name": "Select quantity (dropdown: 1-10)"},
-            {"name": "Choose variant (size/color) if available"},
-            {"name": "Check 'Add protection plan' checkbox"},
-            {"name": "Click 'Buy Now' for instant checkout"},
-            {"name": "Click 'Add to Wishlist' link"}
+            {"name": "Click 'Apple Support' link"}
           ]
         }
       ]
@@ -56,50 +64,27 @@ Return ONLY valid JSON:
       "name": "Interaction 2",
       "children": [
         {
-          "name": "LOA 1: Shopping Cart Page",
+          "name": "LOA 1: Visual State",
           "children": [
-            {"name": "Cart contains 1 item"},
-            {"name": "Subtotal: $XX.XX"},
-            {"name": "Checkout button prominent"}
+            {"name": "CHANGED: Apple Support logo now displayed"},
+            {"name": "CHANGED: Support banner appeared at top"},
+            {"name": "Support icon visible in header"}
           ]
         },
         {
-          "name": "LOA 2: Available User Actions",
+          "name": "LOA 2: Content State",
           "children": [
-            {"name": "Click '+' to increase quantity"},
-            {"name": "Click '-' to decrease quantity"},
-            {"name": "Click 'Remove' to delete item"},
-            {"name": "Click 'Save for Later' link"},
-            {"name": "Enter promo code in text field"},
-            {"name": "Click 'Apply' to submit promo code"},
-            {"name": "Click 'Proceed to Checkout' button"},
-            {"name": "Click product link to return to product"},
-            {"name": "Click 'Continue Shopping' link"}
-          ]
-        }
-      ]
-    },
-    {
-      "name": "Interaction 3",
-      "children": [
-        {
-          "name": "LOA 1: Checkout - Sign In / Guest",
-          "children": [
-            {"name": "Login form displayed"},
-            {"name": "Guest checkout option available"}
+            {"name": "Page title: 'Apple Support'"},
+            {"name": "Support options listed"},
+            {"name": "Contact info displayed"}
           ]
         },
         {
-          "name": "LOA 2: Available User Actions",
+          "name": "LOA 3: Available Actions",
           "children": [
-            {"name": "Enter email in 'Email' text field"},
-            {"name": "Enter password in 'Password' text field"},
-            {"name": "Click 'Sign In' button"},
-            {"name": "Click 'Forgot Password?' link"},
-            {"name": "Click 'Create Account' button"},
-            {"name": "Click 'Continue as Guest' button"},
-            {"name": "Check 'Remember me' checkbox"},
-            {"name": "Click Google/Facebook social login buttons"}
+            {"name": "Click 'Chat with us' button"},
+            {"name": "Click 'Call support' link"},
+            {"name": "Enter issue in search field"}
           ]
         }
       ]
@@ -107,70 +92,89 @@ Return ONLY valid JSON:
   ]
 }
 
-LOA 2 MUST be VERY detailed - list EVERY:
-- Button with exact label ("Click 'Add to Cart' button")
-- Text field with label ("Enter email in 'Email' field")  
-- Dropdown with options ("Select quantity from dropdown (1-10)")
-- Checkbox with label ("Check 'Add protection' checkbox")
-- Link with text ("Click 'Forgot Password?' link")
-- Decision point ("Choose: Sign In vs Continue as Guest")"""
+LOA 1 (Visual) - Note ALL visual changes:
+- Images that appeared/changed
+- Logos/branding visible
+- Icons, banners, headers
+- Color/theme changes
+- Expanded/collapsed sections
+- Modals/popups
+
+LOA 3 (Actions) - List EVERY interactive element:
+- Button with exact label
+- Text field with label
+- Dropdown with options
+- Checkbox with label
+- Link with text"""
 
 class GeminiTreeAnalyzer:
     """Handles Gemini API calls and tree structure generation."""
     
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, initial_tree: dict = None):
         self.client = genai.Client(api_key=api_key) if api_key else None
         self.model_name = "gemini-2.5-flash"
-        self.current_tree = {"name": "User Session", "children": []}
+        self.current_tree = initial_tree or {"name": "User Session", "children": []}
 
     async def analyze_screenshot(self, screenshot_b64: str, metadata: list) -> dict:
         """Send screenshot to Gemini and get tree structure output."""
         if not self.client:
-            print("[Gemini] ⚠ Client not initialized - missing API key")
+            print("[ERROR] Gemini client not initialized - missing API key")
             return self.current_tree
-        print(f"[Gemini] Starting analysis (screenshot: {len(screenshot_b64)} chars, metadata: {len(metadata)} items)")
         try:
             image_data = base64.b64decode(screenshot_b64)
-            print(f"[Gemini] Decoded image: {len(image_data)} bytes")
-            context = f"Recent actions: {metadata}" if metadata else ""
             
-            # Include current tree as context - count existing interactions
-            num_interactions = len([child for child in self.current_tree.get('children', []) if 'Interaction' in child.get('name', '')])
-            current_tree_context = f"\n\nCURRENT TREE (with {num_interactions} interactions already documented):\n{json.dumps(self.current_tree, indent=2)}\n\nIf this screenshot shows a NEW interaction in cart/checkout/auth, add it as 'Interaction {num_interactions + 1}'. Otherwise, return the tree unchanged."
+            num_interactions = len(self.current_tree.get('children', []))
+            next_num = num_interactions + 1
             
-            prompt = f"{SYSTEM_PROMPT}\n\n{context}{current_tree_context}\n\nAnalyze this screenshot:"
+            # Ask Gemini for ONLY the new interaction, we'll append it ourselves
+            single_interaction_prompt = f"""{SYSTEM_PROMPT}
+
+You are on Interaction {next_num}. Return ONLY this single interaction as JSON:
+{{
+  "name": "Interaction {next_num}",
+  "children": [
+    {{"name": "LOA 1: Visual State", "children": [...]}},
+    {{"name": "LOA 2: Content State", "children": [...]}},
+    {{"name": "LOA 3: Available Actions", "children": [...]}}
+  ]
+}}
+
+Analyze this screenshot and return the interaction JSON:"""
             
-            # Run sync call in executor since google-genai doesn't have native async
-            print(f"[Gemini] Calling API with model: {self.model_name}")
+            print(f"[API] Gemini request - analyzing for Interaction {next_num}")
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(None, lambda: self.client.models.generate_content(
                 model=self.model_name,
                 contents=[
-                    prompt,
+                    single_interaction_prompt,
                     types.Part.from_bytes(data=image_data, mime_type="image/png")
                 ],
                 config=types.GenerateContentConfig(temperature=0.2)
             ))
             
-            print(f"[Gemini] ✓ Got response: {len(response.text)} chars")
-            new_tree = self._extract_json(response.text)
-            if new_tree and self._validate_tree(new_tree):
-                print("[Gemini] ✓ Tree validated, using new tree")
-                self.current_tree = new_tree
-            else:
-                print("[Gemini] ⚠ Tree validation failed, keeping existing")
-            print(f"[Gemini] Current tree: {json.dumps(self.current_tree)[:200]}...")
+            new_interaction = self._extract_json(response.text)
+            if new_interaction and self._validate_interaction(new_interaction):
+                # Append new interaction to existing tree
+                self.current_tree['children'].append(new_interaction)
+                print(f"[API] Added Interaction {next_num} - total: {len(self.current_tree.get('children', []))}")
             return self.current_tree
         except Exception as e:
-            print(f"[Gemini] ✗ Error: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"[ERROR] Gemini: {e}")
             return self.current_tree
+    
+    def _validate_interaction(self, interaction: dict) -> bool:
+        """Validate a single interaction has required structure."""
+        if not isinstance(interaction, dict):
+            return False
+        if "name" not in interaction:
+            return False
+        if "children" not in interaction or not isinstance(interaction["children"], list):
+            return False
+        return True
 
     def _extract_json(self, text: str) -> dict:
         """Extract JSON from Gemini response."""
         try:
-            # Try to find JSON in response
             start = text.find("{")
             if start == -1:
                 return None
@@ -185,7 +189,7 @@ class GeminiTreeAnalyzer:
                         return json.loads(json_str)
             return None
         except json.JSONDecodeError as e:
-            print(f"[Gemini] JSON parse error: {e}")
+            print(f"[ERROR] JSON parse: {e}")
             return None
 
     def _validate_tree(self, tree: dict) -> bool:

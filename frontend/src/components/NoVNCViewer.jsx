@@ -1,76 +1,57 @@
 import { useCallback, useState, useEffect, useRef } from 'react'
 
 const VNC_URL = 'http://localhost:6080/vnc.html?autoconnect=true&resize=remote&password=password'
-const SCROLL_DELAY = 500
-const CHANGE_CHECK_INTERVAL = 1000 // Check for changes every 1s (but only trigger Gemini on actual changes)
+const CHANGE_CHECK_INTERVAL = 2000 // Check for URL/content changes every 2s
 
 /**
  * Browser-in-browser via noVNC iframe.
- * Displays VNC session from Docker container.
- * Only triggers Gemini on actual URL or content changes (not timer-based).
+ * Triggers only on clicks and URL changes.
  */
 export default function NoVNCViewer({ onTrigger }) {
   const [status, setStatus] = useState('Ready')
   const [autoDetect, setAutoDetect] = useState(true)
   const [lastActivity, setLastActivity] = useState(null)
-  const [lastUrl, setLastUrl] = useState('')
+  const [lastUrlBarHash, setLastUrlBarHash] = useState('')
   const [lastScreenHash, setLastScreenHash] = useState('')
-  const scrollTimeout = useRef(null)
   const changeCheckInterval = useRef(null)
 
-  // Track mouse activity on the iframe container (won't capture inside iframe, but detects focus)
-  const handleContainerClick = useCallback(() => {
-    setLastActivity('click')
-    // Delay capture to allow VNC to process the click, then check for changes
-    setTimeout(() => checkForChanges('click'), 500)
-  }, [])
-
-  const handleContainerScroll = useCallback(() => {
-    setLastActivity('scroll')
-    // 500ms delay after scroll completion
-    if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
-    scrollTimeout.current = setTimeout(() => {
-      checkForChanges('scroll')
-    }, SCROLL_DELAY)
-  }, [])
-
-  // Hash function for screenshot comparison
-  const simpleHash = (str) => {
-    let hash = 0
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i)
-      hash = ((hash << 5) - hash) + char
-      hash = hash & hash
-    }
-    return hash.toString()
-  }
-
-  // Check for actual changes before triggering Gemini
-  const checkForChanges = useCallback(async (triggerType = 'auto') => {
+  // Check for changes - triggers on clicks or URL bar changes
+  const checkForChanges = useCallback(async (triggerType = 'click') => {
     try {
-      // In a real implementation, we'd query the VNC browser's URL and screenshot
-      // For now, we'll request a screenshot and compare it
       const response = await fetch('http://localhost:8000/check-changes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lastUrl, lastScreenHash })
+        body: JSON.stringify({ lastUrlBarHash, lastScreenHash })
       })
       
       if (response.ok) {
         const data = await response.json()
         if (data.changed) {
-          setLastUrl(data.url || lastUrl)
           setLastScreenHash(data.screenHash || lastScreenHash)
-          setLastActivity(triggerType)
-          onTrigger(triggerType, data.screenshot)
+          setLastUrlBarHash(data.urlBarHash || lastUrlBarHash)
+          
+          // Determine actual trigger type
+          const actualTrigger = data.urlChanged ? 'url_change' : triggerType
+          setLastActivity(actualTrigger)
+          
+          // Trigger Gemini on clicks OR URL changes
+          if (triggerType === 'click' || data.urlChanged) {
+            onTrigger(actualTrigger, data.screenshot)
+          }
         }
       }
     } catch (error) {
       console.error('[NoVNC] Change detection failed:', error)
     }
-  }, [lastUrl, lastScreenHash, onTrigger])
+  }, [lastUrlBarHash, lastScreenHash, onTrigger])
 
-  // Auto-detect changes when enabled
+  // Handle click on iframe container - triggers Gemini
+  const handleContainerClick = useCallback(() => {
+    setLastActivity('click')
+    setTimeout(() => checkForChanges('click'), 500)
+  }, [checkForChanges])
+
+  // Auto-detect URL changes (only triggers Gemini if URL bar changed)
   useEffect(() => {
     if (autoDetect) {
       changeCheckInterval.current = setInterval(() => {
@@ -138,7 +119,6 @@ export default function NoVNCViewer({ onTrigger }) {
       <div 
         style={styles.iframeWrapper}
         onClick={handleContainerClick}
-        onWheel={handleContainerScroll}
       >
         <iframe
           src={VNC_URL}

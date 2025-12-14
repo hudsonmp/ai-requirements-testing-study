@@ -76,6 +76,7 @@ htmlcov/
 # Data & Uploads
 data/
 uploads/
+participants/
 media/
 static/collected-static/
 

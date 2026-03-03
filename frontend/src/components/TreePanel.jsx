@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { apiUrl } from '../api'
 
 /**
  * Editable tree panel with persistent highlighting.
@@ -17,7 +18,7 @@ export default function TreePanel({ tree }) {
 
   // Load highlights on mount
   useEffect(() => {
-    fetch('http://localhost:8000/state')
+    fetch(apiUrl('/state'))
       .then(res => res.json())
       .then(data => {
         if (data.highlights) {
@@ -29,7 +30,7 @@ export default function TreePanel({ tree }) {
   // Save highlights whenever they change
   useEffect(() => {
     if (Object.keys(highlights).length > 0) {
-      fetch('http://localhost:8000/save-highlights', {
+      fetch(apiUrl('/save-highlights'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ highlights })
@@ -73,7 +74,7 @@ export default function TreePanel({ tree }) {
     })
     setHighlights(newHighlights)
     
-    fetch('http://localhost:8000/save-tree', {
+    fetch(apiUrl('/save-tree'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tree: newTree })

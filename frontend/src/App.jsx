@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import MarkdownEditor from './components/MarkdownEditor'
 import NoVNCViewer from './components/NoVNCViewer'
 import TreePanel from './components/TreePanel'
+import { detectBackend, apiUrl, wsUrl } from './api'
 
 export default function App() {
   const [tree, setTree] = useState({ name: 'User Session', children: [] })
@@ -15,37 +16,37 @@ export default function App() {
   const [showParticipantTree, setShowParticipantTree] = useState(false)
   const wsRef = useRef(null)
 
-  // Load saved state on startup
+  // Detect backend port, then load state and open WebSocket
   useEffect(() => {
-    fetch('http://localhost:8000/state')
-      .then(res => res.json())
-      .then(data => {
-        if (data.tree) setTree(data.tree)
-        if (data.notes) setNotes(data.notes)
-      })
-      .catch(err => console.error('[ERROR] Failed to load state:', err))
-  }, [])
+    let socket = null
+    detectBackend().then(base => {
+      fetch(`${base}/state`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.tree) setTree(data.tree)
+          if (data.notes) setNotes(data.notes)
+        })
+        .catch(err => console.error('[ERROR] Failed to load state:', err))
 
-  // WebSocket connection
-  useEffect(() => {
-    const socket = new WebSocket('ws://localhost:8000/ws')
-    socket.onopen = () => { wsRef.current = socket }
-    socket.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data)
-        if (data.type === 'tree_update') {
-          const newTree = JSON.parse(JSON.stringify(data.tree))
-          setTree(newTree)
-          // Also update participant tree if in participant mode
-          setParticipantTree(newTree)
+      socket = new WebSocket(wsUrl('/ws'))
+      socket.onopen = () => { wsRef.current = socket }
+      socket.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data)
+          if (data.type === 'tree_update') {
+            const newTree = JSON.parse(JSON.stringify(data.tree))
+            setTree(newTree)
+            // Also update participant tree if in participant mode
+            setParticipantTree(newTree)
+          }
+        } catch (error) {
+          console.error('[ERROR] WebSocket parse:', error)
         }
-      } catch (error) {
-        console.error('[ERROR] WebSocket parse:', error)
       }
-    }
-    socket.onerror = (e) => console.error('[ERROR] WebSocket:', e)
-    socket.onclose = () => { wsRef.current = null }
-    return () => socket.close()
+      socket.onerror = (e) => console.error('[ERROR] WebSocket:', e)
+      socket.onclose = () => { wsRef.current = null }
+    })
+    return () => { if (socket) socket.close() }
   }, [])
 
   // Send trigger event to backend (click or url_change)
@@ -84,7 +85,7 @@ export default function App() {
     if (!participantName.first.trim() || !participantName.last.trim()) return
     
     try {
-      const res = await fetch('http://localhost:8000/start-participant', {
+      const res = await fetch(apiUrl('/start-participant'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -107,7 +108,7 @@ export default function App() {
   // End participant session
   const endParticipantMode = async () => {
     try {
-      await fetch('http://localhost:8000/end-participant', { method: 'POST' })
+      await fetch(apiUrl('/end-participant'), { method: 'POST' })
       setParticipantMode(false)
       setParticipantName({ first: '', last: '' })
       setParticipantNotes('')

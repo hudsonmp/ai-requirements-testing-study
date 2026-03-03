@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect, useRef } from 'react'
+import { apiUrl } from '../api'
 
 const VNC_URL = 'http://localhost:6080/vnc.html?autoconnect=true&resize=remote&password=password'
 const CHANGE_CHECK_INTERVAL = 2000 // Check for URL/content changes every 2s
@@ -9,7 +10,7 @@ const CHANGE_CHECK_INTERVAL = 2000 // Check for URL/content changes every 2s
  */
 export default function NoVNCViewer({ onTrigger }) {
   const [status, setStatus] = useState('Ready')
-  const [autoDetect, setAutoDetect] = useState(true)
+  const [autoDetect, setAutoDetect] = useState(false)
   const [lastActivity, setLastActivity] = useState(null)
   const [lastUrlBarHash, setLastUrlBarHash] = useState('')
   const [lastScreenHash, setLastScreenHash] = useState('')
@@ -18,7 +19,7 @@ export default function NoVNCViewer({ onTrigger }) {
   // Check for changes - triggers on clicks or URL bar changes
   const checkForChanges = useCallback(async (triggerType = 'click') => {
     try {
-      const response = await fetch('http://localhost:8000/check-changes', {
+      const response = await fetch(apiUrl('/check-changes'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lastUrlBarHash, lastScreenHash })
@@ -68,7 +69,7 @@ export default function NoVNCViewer({ onTrigger }) {
   // Manual capture button - force capture and send to Gemini automatically
   const handleCapture = useCallback(() => {
     setLastActivity('capturing...')
-    fetch('http://localhost:8000/force-capture', {
+    fetch(apiUrl('/force-capture'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
     })

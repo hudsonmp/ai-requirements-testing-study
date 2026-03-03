@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'SF Mono', 'Menlo', 'Consolas', monospace; background: #1e1e1e; color: #d4d4d4; height: 100vh; display: flex; flex-direction: column; }
+
+.toolbar { background: #2d2d2d; padding: 6px 14px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #404040; font-size: 12px; }
+.toolbar .dots { display: flex; gap: 6px; }
+.toolbar .dot { width: 10px; height: 10px; border-radius: 50%; }
+.toolbar .dot.r { background: #ff5f57; }
+.toolbar .dot.y { background: #ffbd2e; }
+.toolbar .dot.g { background: #28c840; }
+.toolbar .url { flex: 1; background: #3c3c3c; border: 1px solid #555; border-radius: 4px; padding: 4px 10px; color: #ccc; font-size: 11px; }
+.toolbar .tab { padding: 4px 12px; background: #1e1e1e; border: 1px solid #404040; border-bottom: none; border-radius: 4px 4px 0 0; color: #aaa; font-size: 11px; }
+.toolbar .tab.active { background: #1e1e1e; color: #fff; border-bottom: 1px solid #1e1e1e; }
+
+.editor { flex: 1; display: flex; overflow: hidden; }
+.sidebar { width: 44px; background: #252526; border-right: 1px solid #333; display: flex; flex-direction: column; align-items: center; padding-top: 10px; gap: 18px; }
+.sidebar .icon { width: 22px; height: 22px; background: #555; border-radius: 3px; opacity: 0.5; }
+.sidebar .icon.active { opacity: 1; background: #888; }
+
+.filetree { width: 180px; background: #252526; border-right: 1px solid #333; padding: 8px 0; font-size: 12px; color: #ccc; overflow: hidden; }
+.filetree .header { padding: 4px 12px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 4px; }
+.filetree .file { padding: 3px 12px 3px 24px; cursor: pointer; white-space: nowrap; }
+.filetree .file:hover { background: #2a2d2e; }
+.filetree .file.active { background: #37373d; color: #fff; }
+.filetree .folder { padding: 3px 12px; color: #aaa; }
+
+.code-area { flex: 1; display: flex; flex-direction: column; }
+.tab-bar { background: #252526; display: flex; border-bottom: 1px solid #333; }
+.code-tab { padding: 6px 16px; font-size: 12px; color: #888; border-right: 1px solid #333; cursor: pointer; }
+.code-tab.active { background: #1e1e1e; color: #fff; }
+
+.code { flex: 1; padding: 12px; font-size: 13px; line-height: 1.65; overflow: auto; }
+.ln { color: #555; display: inline-block; width: 32px; text-align: right; margin-right: 16px; user-select: none; }
+.kw { color: #569cd6; }
+.fn { color: #dcdcaa; }
+.str { color: #ce9178; }
+.cm { color: #6a9955; }
+.num { color: #b5cea8; }
+.ty { color: #4ec9b0; }
+.op { color: #d4d4d4; }
+.param { color: #9cdcfe; }
+
+.terminal { height: 120px; background: #1e1e1e; border-top: 1px solid #404040; padding: 8px 14px; font-size: 11px; color: #aaa; overflow: hidden; }
+.terminal .prompt { color: #6a9955; }
+.terminal .cmd { color: #dcdcaa; }
+.terminal .out { color: #888; }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div>
+  <span class="tab active">main.py</span>
+  <span class="tab">test_matching.py</span>
+  <span class="url">~/req-eng-intervention/system/backend/main.py</span>
+</div>
+
+<div class="editor">
+  <div class="sidebar">
+    <div class="icon active"></div>
+    <div class="icon"></div>
+    <div class="icon"></div>
+    <div class="icon"></div>
+  </div>
+  <div class="filetree">
+    <div class="header">Explorer</div>
+    <div class="folder">&#9660; system</div>
+    <div class="folder" style="padding-left:24px">&#9660; backend</div>
+    <div class="file active" style="padding-left:36px">main.py</div>
+    <div class="file" style="padding-left:36px">test_matching.py</div>
+    <div class="file" style="padding-left:36px">data.py</div>
+    <div class="folder" style="padding-left:24px">&#9654; frontend</div>
+    <div class="file">requirements.txt</div>
+    <div class="file">.env</div>
+  </div>
+  <div class="code-area">
+    <div class="tab-bar">
+      <div class="code-tab active">main.py</div>
+      <div class="code-tab">test_matching.py</div>
+    </div>
+    <div class="code">
+<span class="ln">38</span><span class="kw">def</span> <span class="fn">match_rider_to_vehicle</span>(<span class="param">rider</span>, <span class="param">vehicles</span>):<br>
+<span class="ln">39</span>    <span class="str">"""Match a rider to the nearest available vehicle."""</span><br>
+<span class="ln">40</span>    <span class="param">best</span> = <span class="kw">None</span><br>
+<span class="ln">41</span>    <span class="param">best_dist</span> = <span class="fn">float</span>(<span class="str">'inf'</span>)<br>
+<span class="ln">42</span><br>
+<span class="ln">43</span>    <span class="kw">for</span> <span class="param">v</span> <span class="kw">in</span> <span class="param">vehicles</span>:<br>
+<span class="ln">44</span>        <span class="kw">if</span> <span class="param">v</span>.<span class="param">is_occupied</span> <span class="kw">or</span> <span class="param">v</span>.<span class="param">is_assigned</span>:<br>
+<span class="ln">45</span>            <span class="kw">continue</span><br>
+<span class="ln">46</span>        <span class="cm"># BUG: no check for v.is_accessible</span><br>
+<span class="ln">47</span>        <span class="param">dist</span> = <span class="fn">euclidean</span>(<span class="param">rider</span>.<span class="param">origin</span>, <span class="param">v</span>.<span class="param">current_location</span>)<br>
+<span class="ln">48</span>        <span class="kw">if</span> <span class="param">dist</span> < <span class="param">best_dist</span>:<br>
+<span class="ln">49</span>            <span class="param">best_dist</span> = <span class="param">dist</span><br>
+<span class="ln">50</span>            <span class="param">best</span> = <span class="param">v</span><br>
+<span class="ln">51</span><br>
+<span class="ln">52</span>    <span class="kw">return</span> <span class="param">best</span><br>
+<span class="ln">53</span><br>
+<span class="ln">54</span><br>
+<span class="ln">55</span><span class="kw">def</span> <span class="fn">process_requests</span>(<span class="param">requests</span>, <span class="param">vehicles</span>):<br>
+<span class="ln">56</span>    <span class="str">"""Process rider requests in order received."""</span><br>
+<span class="ln">57</span>    <span class="cm"># BUG: no sorting by request_time</span><br>
+<span class="ln">58</span>    <span class="param">assignments</span> = {}<br>
+<span class="ln">59</span>    <span class="kw">for</span> <span class="param">r</span> <span class="kw">in</span> <span class="param">requests</span>:<br>
+<span class="ln">60</span>        <span class="param">v</span> = <span class="fn">match_rider_to_vehicle</span>(<span class="param">r</span>, <span class="param">vehicles</span>)<br>
+<span class="ln">61</span>        <span class="kw">if</span> <span class="param">v</span>:<br>
+<span class="ln">62</span>            <span class="param">assignments</span>[<span class="param">r</span>.<span class="param">id</span>] = <span class="param">v</span>.<span class="param">id</span><br>
+<span class="ln">63</span>            <span class="param">v</span>.<span class="param">is_assigned</span> = <span class="kw">True</span><br>
+<span class="ln">64</span>    <span class="kw">return</span> <span class="param">assignments</span><br>
+    </div>
+    <div class="terminal">
+      <div><span class="prompt">$</span> <span class="cmd">python test_matching.py</span></div>
+      <div class="out">FAIL: test_equidistant_riders - R2 assigned instead of R1 (no request_time ordering)</div>
+      <div class="out">FAIL: test_accessible_match - non-accessible V1 assigned to accessible R1</div>
+      <div class="out">PASS: test_nearest_vehicle</div>
+      <div class="out">PASS: test_occupied_skip</div>
+      <div style="color:#c94c4c">2 failed, 2 passed (4 total)</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
